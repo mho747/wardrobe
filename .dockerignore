@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+node_modules
+dist
+.env
+.env.*
+!.env.example
+data
+backups
+update-state
+candidates
+*.log
+README.md
+CONTRIBUTING.md
+docs

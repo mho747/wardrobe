@@ -1,0 +1,94 @@
+services:
+  wardrobe:
+    container_name: ${WARDROBE_CONTAINER_NAME:-wardrobe}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VCS_REF: ${WARDROBE_REVISION:-unknown}
+    image: wardrobe:${WARDROBE_REVISION:-local}
+    labels:
+      org.opencontainers.image.revision: ${WARDROBE_REVISION:-unknown}
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      WARDROBE_DATA_DIR: /app/data
+      WARDROBE_MODEL_REFERENCE: /app/data/model-reference.png
+    ports:
+      - "${WARDROBE_BIND_ADDRESS:?Set the Synology LAN IP in .env}:${WARDROBE_HOST_PORT:-4173}:4173"
+    volumes:
+      - ${WARDROBE_DATA_HOST_PATH:-/volume1/docker/wardrobe/data}:/app/data
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('node:http');const request=http.get('http://127.0.0.1:4173/api/import/config',(response)=>{response.resume();process.exit(response.statusCode===200?0:1)});request.setTimeout(4000,()=>request.destroy(new Error('timeout')));request.on('error',()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  wardrobe-backup:
+    container_name: ${WARDROBE_BACKUP_CONTAINER_NAME:-wardrobe-backup}
+    image: alpine:3.21
+    user: "1000:1000"
+    environment:
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ${WARDROBE_DATA_HOST_PATH:-/volume1/docker/wardrobe/data}:/source:ro
+      - ${WARDROBE_BACKUP_HOST_PATH:-/volume1/docker/wardrobe/backups}:/backups
+      - ./scripts/backup.sh:/usr/local/bin/wardrobe-backup:ro
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    command: ["/bin/sh", "/usr/local/bin/wardrobe-backup"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /backups/.last-success"]
+      interval: 1m
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+
+  wardrobe-update-check:
+    container_name: ${WARDROBE_UPDATE_CONTAINER_NAME:-wardrobe-update-check}
+    image: wardrobe:${WARDROBE_REVISION:-local}
+    user: "1000:1000"
+    environment:
+      GITHUB_REPOSITORY_URL: ${GITHUB_REPOSITORY_URL:-https://github.com/tandpfun/wardrobe.git}
+      GITHUB_BRANCH: ${GITHUB_BRANCH:-main}
+      WARDROBE_REVISION: ${WARDROBE_REVISION:-unknown}
+      UPDATE_CHECK_INTERVAL_SECONDS: ${UPDATE_CHECK_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ${WARDROBE_UPDATE_STATE_HOST_PATH:-/volume1/docker/wardrobe/update-state}:/state
+      - ./scripts/update-check.mjs:/app/scripts/update-check.mjs:ro
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      wardrobe:
+        condition: service_started
+    command: ["node", "/app/scripts/update-check.mjs"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs');process.exit(fs.existsSync('/state/update-status.json')&&fs.statSync('/state/update-status.json').size>0?0:1)"]
+      interval: 1m
+      timeout: 5s
+      start_period: 45s
+      retries: 3
