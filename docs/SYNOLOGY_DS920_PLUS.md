@@ -49,7 +49,7 @@ Geef `data`, `backups`, `update-state` en `candidates` eigenaar UID/GID `1000:10
 
 ## Gecontroleerde eerste start
 
-Na het veilig aanmaken van `.env`, de referentiefoto en de mappen voert `scripts/deploy-synology.sh` dit uit:
+Na het veilig aanmaken van `.env`, de referentiefoto en de mappen voert `scripts/deploy-synology.sh` dit uit. Bij de eerste installatie verzorgt `scripts/install-synology-root.sh` de nieuwe lokale Git-checkout, rechten, geheime `.env` en referentiefoto via standaardinvoer; de key komt niet in een commandoregel of log terecht.
 
 1. bouwt de image uit het lockbestand;
 2. start de drie eigen containers;

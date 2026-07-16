@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/bin:$PATH"
+export PATH
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 EXPECTED_DATA_PATH='/volume1/docker/wardrobe/data'

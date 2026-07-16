@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/bin:$PATH"
+export PATH
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 CANDIDATES_ROOT="${WARDROBE_CANDIDATES_ROOT:-/volume1/docker/wardrobe/candidates}"
