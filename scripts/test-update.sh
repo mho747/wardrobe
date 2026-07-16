@@ -42,20 +42,23 @@ git remote get-url origin >/dev/null 2>&1 || git remote add origin "$GITHUB_REPO
 git fetch --prune origin "$GITHUB_BRANCH"
 
 current_revision="$(git rev-parse HEAD)"
+upstream_revision="$(awk -F= '$1 == "WARDROBE_UPSTREAM_REVISION" { print substr($0, index($0, "=") + 1); exit }' .env)"
+test -n "$upstream_revision" || fail 'WARDROBE_UPSTREAM_REVISION is missing from .env.'
 candidate_revision="$(git rev-parse "origin/$GITHUB_BRANCH")"
-if [ "$current_revision" = "$candidate_revision" ]; then
-  printf 'No GitHub update is available. Current revision: %s\n' "$current_revision"
+if [ "$upstream_revision" = "$candidate_revision" ]; then
+  printf 'No GitHub update is available. Current upstream revision: %s\n' "$upstream_revision"
   exit 0
 fi
 
-changed_files="$(git diff --name-only "$current_revision..$candidate_revision")"
+git merge-base --is-ancestor "$upstream_revision" "$candidate_revision" || fail 'The GitHub update is not a fast-forward from the recorded upstream revision.'
+changed_files="$(git diff --name-only "$upstream_revision..$candidate_revision")"
 printf '%s\n' "$changed_files"
 
 if printf '%s\n' "$changed_files" | grep -E '(^|/)(Dockerfile|compose\.ya?ml|package(-lock)?\.json|\.env\.example|vite\.config\.[^/]+|scripts/)' >/dev/null && [ "${ALLOW_SENSITIVE_CANDIDATE:-0}" != '1' ]; then
   printf '%s\n' 'REQUIRES_APPROVAL: update changes dependencies, container/configuration, or execution scripts.' >&2
   exit 3
 fi
-if git diff --unified=0 "$current_revision..$candidate_revision" -- src scripts vite.config.mjs | grep -E '(^[+-].*(OPENAI|/api/|model|auth|security|https?://))' >/dev/null && [ "${ALLOW_SENSITIVE_CANDIDATE:-0}" != '1' ]; then
+if git diff --unified=0 "$upstream_revision..$candidate_revision" -- src scripts vite.config.mjs | grep -E '(^[+-].*(OPENAI|/api/|model|auth|security|https?://))' >/dev/null && [ "${ALLOW_SENSITIVE_CANDIDATE:-0}" != '1' ]; then
   printf '%s\n' 'REQUIRES_APPROVAL: update may affect API use, models, costs, or security.' >&2
   exit 3
 fi
@@ -77,6 +80,11 @@ cleanup() {
   git -C "$ROOT" worktree remove --force "$candidate_dir" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT HUP INT TERM
+
+for deployment_file in .dockerignore Dockerfile compose.yaml scripts/backup.sh scripts/update-check.mjs; do
+  mkdir -p "$candidate_dir/$(dirname "$deployment_file")"
+  cp "$ROOT/$deployment_file" "$candidate_dir/$deployment_file"
+done
 
 mkdir -p "$candidate_data" "$candidate_backups" "$candidate_state"
 chown 1000:1000 "$candidate_data" "$candidate_backups" "$candidate_state"

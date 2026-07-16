@@ -1,6 +1,6 @@
 # Wardrobe op Synology DS920+ (Container Manager)
 
-Deze map bevat de minimale productie-inrichting voor Wardrobe. De applicatiecode en API-routes blijven ongewijzigd: de container start de bestaande Vite Preview-server en de bestaande import-middleware.
+Deze map bevat de minimale productie-inrichting voor Wardrobe. De applicatiecode en API-routes blijven ongewijzigd: de container start de bestaande Vite Preview-server en de bestaande import-middleware. De Synology-checkout is een eigen lokale Git-bron; GitHub blijft een alleen-lezen upstream voor gecontroleerde kandidaatupdates.
 
 ## Wat wordt geïnstalleerd
 
@@ -61,7 +61,7 @@ De procedure slaagt alleen wanneer de API `ready: true` rapporteert. Dat bewijst
 
 ## Updatebeleid
 
-`update-status.json` kan `current`, `update_available` of `check_failed` bevatten. Een beschikbare update wordt nooit automatisch geïnstalleerd.
+`update-status.json` kan `current`, `update_available` of `check_failed` bevatten. Een beschikbare update wordt nooit automatisch geïnstalleerd. `WARDROBE_REVISION` identificeert de exacte lokale deploymentcommit; `WARDROBE_UPSTREAM_REVISION` is de laatst beoordeelde GitHub-revisie.
 
 Voor iedere wijziging geldt:
 

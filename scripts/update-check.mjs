@@ -4,6 +4,7 @@ const stateDir = process.env.STATE_DIR || "/state";
 const repositoryUrl = process.env.GITHUB_REPOSITORY_URL || "https://github.com/tandpfun/wardrobe.git";
 const branch = process.env.GITHUB_BRANCH || "main";
 const deployedRevision = process.env.WARDROBE_REVISION || "unknown";
+const upstreamRevision = process.env.WARDROBE_UPSTREAM_REVISION || deployedRevision;
 const interval = Number.parseInt(process.env.UPDATE_CHECK_INTERVAL_SECONDS || "86400", 10);
 const runOnce = process.env.UPDATE_CHECK_ONCE === "1";
 
@@ -35,8 +36,9 @@ async function checkOnce() {
     if (typeof payload.sha !== "string" || !/^[0-9a-f]{40}$/i.test(payload.sha)) throw new Error("GitHub returned no valid commit SHA.");
     await writeStatus({
       checked_at: checkedAt,
-      status: payload.sha === deployedRevision ? "current" : "update_available",
+      status: payload.sha === upstreamRevision ? "current" : "update_available",
       deployed_revision: deployedRevision,
+      upstream_revision: upstreamRevision,
       remote_revision: payload.sha,
       branch,
     });

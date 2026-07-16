@@ -15,10 +15,12 @@ test "${1:-}" = '--approved-sensitive' || fail 'Refusing update without --approv
 git remote get-url origin >/dev/null 2>&1 || git remote add origin "$GITHUB_REPOSITORY_URL"
 git fetch --prune origin "$GITHUB_BRANCH"
 previous_revision="$(git rev-parse HEAD)"
+previous_upstream_revision="$(awk -F= '$1 == "WARDROBE_UPSTREAM_REVISION" { print substr($0, index($0, "=") + 1); exit }' .env)"
+test -n "$previous_upstream_revision" || fail 'WARDROBE_UPSTREAM_REVISION is missing from .env.'
 candidate_revision="$(git rev-parse "origin/$GITHUB_BRANCH")"
 
-if [ "$previous_revision" = "$candidate_revision" ]; then
-  printf 'No GitHub update is available. Current revision: %s\n' "$previous_revision"
+if [ "$previous_upstream_revision" = "$candidate_revision" ]; then
+  printf 'No GitHub update is available. Current upstream revision: %s\n' "$previous_upstream_revision"
   exit 0
 fi
 
@@ -37,6 +39,13 @@ fi
 rollback() {
   printf 'Update failed; restoring verified revision %s.\n' "$previous_revision" >&2
   git reset --hard "$previous_revision"
+  revision_file=".env.rollback.$$"
+  awk -v revision="$previous_upstream_revision" '
+    /^WARDROBE_UPSTREAM_REVISION=/ { print "WARDROBE_UPSTREAM_REVISION=" revision; found=1; next }
+    { print }
+    END { if (!found) print "WARDROBE_UPSTREAM_REVISION=" revision }
+  ' .env > "$revision_file"
+  mv "$revision_file" .env
   if ! ./scripts/deploy-synology.sh; then
     printf '%s\n' 'CRITICAL: automatic rollback could not be verified. Leave the service unchanged and inspect the deployment logs.' >&2
     exit 2
@@ -45,9 +54,18 @@ rollback() {
   exit 1
 }
 
-if ! git merge --ff-only "$candidate_revision"; then
-  fail 'Refusing update because the candidate is not a fast-forward Git update.'
+if ! git merge --no-edit "$candidate_revision"; then
+  fail 'Refusing update because the GitHub update cannot merge cleanly with the protected deployment checkout.'
 fi
+
+revision_file=".env.upstream.$$"
+awk -v revision="$candidate_revision" '
+  /^WARDROBE_UPSTREAM_REVISION=/ { print "WARDROBE_UPSTREAM_REVISION=" revision; found=1; next }
+  { print }
+  END { if (!found) print "WARDROBE_UPSTREAM_REVISION=" revision }
+' .env > "$revision_file"
+mv "$revision_file" .env
+chmod 600 .env
 
 if ! ./scripts/deploy-synology.sh; then
   rollback
