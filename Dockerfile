@@ -25,6 +25,7 @@ COPY --from=build --chown=node:node /app/vite.config.mjs ./vite.config.mjs
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/scripts ./scripts
 COPY --from=build --chown=node:node /app/dist ./dist
+RUN mkdir -p /app/node_modules/.vite-temp && chown node:node /app/node_modules/.vite-temp
 
 USER node
 EXPOSE 4173

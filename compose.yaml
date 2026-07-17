@@ -23,6 +23,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:uid=1000,gid=1000,mode=1777
+      - /app/node_modules/.vite-temp:uid=1000,gid=1000,mode=0755
     cap_drop:
       - ALL
     security_opt:

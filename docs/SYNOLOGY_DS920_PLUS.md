@@ -28,7 +28,9 @@ WARDROBE_HOST_PORT=4173
 Gebruik nooit `0.0.0.0`, maak geen router-port-forwarding voor 4173 en
 publiceer geen reverse proxy naar deze dienst. De containers draaien als
 UID/GID `1000`, met alleen-lezen rootfilesystem, beperkte capabilities,
-healthchecks en automatische herstart.
+healthchecks en automatische herstart. Alleen `/tmp` en Vite's tijdelijke
+config-cache zijn kortstondige `tmpfs`-mappen; geen applicatie- of gebruikersdata
+staat daarin.
 
 ## Eerste installatie
 
