@@ -4,6 +4,8 @@ import "./import-flow.css";
 
 const API = "/api/import/jobs";
 const CONFIG_API = "/api/import/config";
+const MAX_DIRECT_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_NORMALIZED_DIMENSION = 2048;
 const PARTS = [
   ["upperbody", "Tops"],
   ["wholebody_up", "Jackets"],
@@ -19,6 +21,42 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.onerror = () => reject(reader.error || new Error("Could not read that image."));
   reader.readAsDataURL(file);
 });
+
+const loadBrowserImage = (file) => new Promise((resolve, reject) => {
+  const source = URL.createObjectURL(file);
+  const image = new Image();
+  image.onload = () => resolve({ image, source });
+  image.onerror = () => {
+    URL.revokeObjectURL(source);
+    reject(new Error(`Could not read ${file.name}. Export this photo as JPEG, PNG, or WebP and try again.`));
+  };
+  image.src = source;
+});
+
+const canvasToJpeg = (canvas, quality) => new Promise((resolve, reject) => {
+  canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not prepare that image for upload.")), "image/jpeg", quality);
+});
+
+async function normalizeForUpload(file) {
+  const { image, source } = await loadBrowserImage(file);
+  try {
+    const scale = Math.min(1, MAX_NORMALIZED_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(image, 0, 0, width, height);
+    return canvasToJpeg(canvas, 0.9);
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
+
+async function imageToUploadDataUrl(file) {
+  const requiresConversion = file.size > MAX_DIRECT_UPLOAD_BYTES || ["image/heic", "image/heif"].includes(file.type.toLowerCase());
+  return fileToDataUrl(requiresConversion ? await normalizeForUpload(file) : file);
+}
 
 async function api(path, options) {
   const response = await fetch(path, {
@@ -179,7 +217,7 @@ export function WardrobeImportFlow({ onGarmentApproved, onModeledApproved }) {
     setDragging(false); setError(""); setNotice(null);
     for (const file of images) {
       try {
-        const imageDataUrl = await fileToDataUrl(file);
+        const imageDataUrl = await imageToUploadDataUrl(file);
         const result = await api(API, { method: "POST", body: JSON.stringify({ imageDataUrl, metadata: { name: file.name.replace(/\.[^.]+$/, "") } }) });
         const createdJobs = result.jobs || [result];
         if (!createdJobs.length && result.noClothingDetected) {
@@ -189,7 +227,7 @@ export function WardrobeImportFlow({ onGarmentApproved, onModeledApproved }) {
         }
         setJobs((current) => [...current, ...createdJobs]);
         setDrafts((current) => ({ ...current, ...Object.fromEntries(createdJobs.map((job) => [job.id, defaultDraft(job)])) }));
-      } catch (requestError) { setError(requestError.message); }
+      } catch (requestError) { setError(requestError.message); setOpen(true); }
     }
   }, [setup]);
 
