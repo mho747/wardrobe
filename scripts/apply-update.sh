@@ -30,11 +30,7 @@ if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev
   fail 'Docker Compose is not installed on this Synology.'
 fi
 
-if docker compose version >/dev/null 2>&1; then
-  docker compose run --rm --no-deps -e WARDROBE_BACKUP_ONCE=1 wardrobe-backup
-else
-  docker-compose run --rm --no-deps -e WARDROBE_BACKUP_ONCE=1 wardrobe-backup
-fi
+docker exec -e WARDROBE_BACKUP_ONCE=1 wardrobe-backup /bin/sh /usr/local/bin/wardrobe-backup
 
 rollback() {
   printf 'Update failed; restoring verified revision %s.\n' "$previous_revision" >&2

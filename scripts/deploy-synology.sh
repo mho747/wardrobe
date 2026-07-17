@@ -64,7 +64,7 @@ compose restart wardrobe
 wait_for_healthy wardrobe || fail 'Wardrobe did not return healthy after its restart test.'
 api_smoke_test || fail 'Wardrobe importer failed after the restart test.'
 
-compose run --rm --no-deps -e WARDROBE_BACKUP_ONCE=1 wardrobe-backup
+docker exec -e WARDROBE_BACKUP_ONCE=1 wardrobe-backup /bin/sh /usr/local/bin/wardrobe-backup
 last_backup="$(awk 'NR == 1 { print $2 }' /volume1/docker/wardrobe/backups/.last-success)"
 test -n "$last_backup" || fail 'Backup status file was not written.'
 docker exec wardrobe-backup tar -tzf "/backups/$last_backup" >/dev/null
