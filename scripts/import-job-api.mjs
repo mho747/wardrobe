@@ -657,6 +657,8 @@ export function wardrobeImportApi(options = {}) {
       return json(res, 404, { error: "Not found" });
     } catch (error) {
       const statusCode = error.code === "ENOENT" ? 404 : error.status || 500;
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error(`[wardrobe-import] ${req.method} ${url.pathname} failed (${statusCode}): ${detail}`);
       return json(res, statusCode, { error: statusCode === 500 ? "Internal server error" : error.message, ...(process.env.NODE_ENV === "development" && statusCode === 500 ? { detail: error.message } : {}) });
     }
   }
