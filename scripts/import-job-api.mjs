@@ -4,6 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 const API_ROOT = "/api/import/jobs";
+const COSTS_API_ROOT = "/api/import/costs";
 const ASSET_ROOT = "/api/import/assets";
 const LIBRARY_ASSET_ROOT = "/api/import/library";
 const STAGES = new Set(["crop", "garment", "modeled"]);
@@ -340,6 +341,68 @@ async function openAIAnalyze({ key, baseUrl, model, image, mime }) {
   return parsed.items;
 }
 
+function costsRange(days = 30) {
+  const now = new Date();
+  const endTime = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) / 1000);
+  return { days, startTime: endTime - ((days - 1) * 86400), endTime };
+}
+
+async function openAICosts({ key, baseUrl, range, projectId }) {
+  const endpoint = new URL(`${baseUrl}/organization/costs`);
+  endpoint.searchParams.set("start_time", String(range.startTime));
+  endpoint.searchParams.set("end_time", String(range.endTime));
+  endpoint.searchParams.set("bucket_width", "1d");
+  endpoint.searchParams.set("limit", String(range.days));
+  endpoint.searchParams.append("group_by", "line_item");
+  if (projectId) endpoint.searchParams.append("project_ids", projectId);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${key}` }, signal: controller.signal });
+    if (!response.ok) throw Object.assign(new Error(`OpenAI Costs API returned ${response.status}.`), { status: 502 });
+    const result = await response.json();
+    if (!Array.isArray(result.data)) throw Object.assign(new Error("OpenAI Costs API returned an invalid response."), { status: 502 });
+    return result;
+  } catch (error) {
+    if (error.name === "AbortError") throw Object.assign(new Error("OpenAI Costs API did not respond within 10 seconds."), { status: 504 });
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function summarizeCosts(payload, range, scope) {
+  const totals = new Map();
+  const byLineItem = new Map();
+  const daily = [];
+  const add = (target, currency, value) => target.set(currency, (target.get(currency) || 0) + value);
+  for (const bucket of payload.data) {
+    const bucketTotals = new Map();
+    for (const result of Array.isArray(bucket.results) ? bucket.results : []) {
+      const value = Number(result?.amount?.value);
+      const currency = typeof result?.amount?.currency === "string" ? result.amount.currency.toUpperCase() : "USD";
+      if (!Number.isFinite(value)) continue;
+      add(totals, currency, value);
+      add(bucketTotals, currency, value);
+      add(byLineItem, `${result.line_item || "Other"}\u0000${currency}`, value);
+    }
+    daily.push({ startTime: bucket.start_time, endTime: bucket.end_time, totals: [...bucketTotals.entries()].map(([currency, value]) => ({ currency, value })) });
+  }
+  return {
+    source: "OpenAI Costs API",
+    scope,
+    range,
+    totals: [...totals.entries()].map(([currency, value]) => ({ currency, value })),
+    daily,
+    lineItems: [...byLineItem.entries()].map(([key, value]) => {
+      const [lineItem, currency] = key.split("\u0000");
+      return { lineItem, currency, value };
+    }).sort((left, right) => right.value - left.value),
+    retrievedAt: new Date().toISOString(),
+  };
+}
+
 export function wardrobeImportApi(options = {}) {
   let root;
   let jobsDir;
@@ -496,6 +559,14 @@ export function wardrobeImportApi(options = {}) {
       }
       if (url.pathname === "/api/import/config" && req.method === "GET") {
         return json(res, 200, await setupStatus());
+      }
+      if (url.pathname === COSTS_API_ROOT && req.method === "GET") {
+        const adminKey = setting("OPENAI_ADMIN_API_KEY").trim();
+        if (!adminKey) return json(res, 503, { configured: false, error: "OpenAI Costs API is not configured." });
+        const projectId = setting("OPENAI_COSTS_PROJECT_ID").trim();
+        const range = costsRange();
+        const payload = await openAICosts({ key: adminKey, baseUrl: apiBaseUrl(), range, projectId });
+        return json(res, 200, { configured: true, ...summarizeCosts(payload, range, projectId ? "project" : "organization") });
       }
       const wardrobeDeleteMatch = url.pathname.match(/^\/api\/import\/wardrobe\/(import-[a-f0-9-]{36})$/i);
       if (wardrobeDeleteMatch && req.method === "DELETE") {

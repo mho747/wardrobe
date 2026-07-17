@@ -532,12 +532,75 @@ function ItemViewer({ item, onClose, onSave, onDelete }) {
   );
 }
 
+function formatCost({ currency, value }) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency}`;
+  }
+}
+
+function CostPanel({ onClose }) {
+  const [state, setState] = useState({ status: "loading" });
+
+  const load = useCallback(async () => {
+    setState({ status: "loading" });
+    try {
+      const response = await fetch("/api/import/costs", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 503) {
+        setState({ status: "unconfigured", message: payload.error || "OpenAI Costs API is not configured." });
+        return;
+      }
+      if (!response.ok) throw new Error(payload.error || "Costs could not be fetched.");
+      setState({ status: "ready", costs: payload });
+    } catch (error) {
+      setState({ status: "error", message: error.message || "Costs could not be fetched." });
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const costs = state.costs;
+  const today = costs?.daily.find((bucket) => bucket.startTime === costs.range.endTime - 86400);
+  const title = costs?.scope === "project" ? "This project" : "Organization total";
+
+  return (
+    <div className="cost-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <aside className="cost-panel" role="dialog" aria-modal="true" aria-label="OpenAI costs">
+        <button className="viewer-icon-close" type="button" onClick={onClose} aria-label="Close costs"><X size={24} weight="light" aria-hidden="true" /></button>
+        <p className="cost-eyebrow">OpenAI usage</p>
+        <h2>Costs</h2>
+        {state.status === "loading" && <p className="cost-status">Loading the exact billed costs…</p>}
+        {state.status === "unconfigured" && <p className="cost-status">Costs are not configured. Add a restricted OpenAI Admin key on the Synology to enable this view.</p>}
+        {state.status === "error" && <p className="cost-status cost-error">{state.message}</p>}
+        {state.status === "ready" && <>
+          <p className="cost-scope">{title} · last {costs.range.days} UTC days</p>
+          <div className="cost-total-list">
+            {costs.totals.map((total) => <div key={total.currency}><span>Total</span><strong>{formatCost(total)}</strong></div>)}
+            {!costs.totals.length && <div><span>Total</span><strong>0.00</strong></div>}
+          </div>
+          <div className="cost-detail-list">
+            <div className="cost-detail-row"><span>Today (UTC)</span><strong>{today?.totals?.map(formatCost).join(" · ") || "0.00"}</strong></div>
+            {costs.lineItems.map((line) => <div className="cost-detail-row" key={`${line.lineItem}:${line.currency}`}><span>{line.lineItem}</span><strong>{formatCost(line)}</strong></div>)}
+          </div>
+          <p className="cost-updated">Retrieved {new Date(costs.retrievedAt).toLocaleString()} from the OpenAI Costs API.</p>
+        </>}
+        <button className="secondary-button cost-refresh" type="button" onClick={load} disabled={state.status === "loading"}>{state.status === "loading" ? "Loading…" : "Refresh"}</button>
+      </aside>
+    </div>
+  );
+}
+
 export function App() {
   const [items, setItems] = useState([]);
   const [activeType, setActiveType] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [costsOpen, setCostsOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/import/wardrobe", { cache: "no-store" })
@@ -609,6 +672,7 @@ export function App() {
         <header className="gallery-header">
           <div className="gallery-meta-row">
             <p className="piece-count">{items.length} {items.length === 1 ? "piece" : "pieces"}</p>
+            <button className="cost-button" type="button" onClick={() => setCostsOpen(true)}>Costs</button>
           </div>
           <nav className="category-nav" aria-label="Filter wardrobe by item type">
             {TYPES.map((type) => (
@@ -644,6 +708,7 @@ export function App() {
       </main>
 
       {selectedItem && <ItemViewer item={selectedItem} onClose={() => setSelectedId(null)} onSave={saveItem} onDelete={deleteItem} />}
+      {costsOpen && <CostPanel onClose={() => setCostsOpen(false)} />}
       <WardrobeImportFlow onGarmentApproved={addImportedItem} onModeledApproved={attachImportedModeledImage} />
     </div>
   );

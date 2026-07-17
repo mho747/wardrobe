@@ -57,6 +57,25 @@ vervangt alleen de overeenkomstige regel in de lokale `.env`, herstart alleen
 de `wardrobe`-container en herstelt de vorige `.env` wanneer de healthcheck
 faalt. Er vindt geen OpenAI-aanroep plaats.
 
+## Exacte OpenAI-kosten (optioneel)
+
+Wardrobe kan de exacte bedragen uit de OpenAI Costs API tonen voor de laatste
+30 UTC-dagen. Dit is een alleen-lezen koppeling: de browser krijgt nooit een
+OpenAI-sleutel, en Wardrobe verstuurt pas een kostenverzoek wanneer je in de
+lokale webinterface op `Costs` klikt.
+
+Gebruik hiervoor **niet** de gewone `OPENAI_API_KEY`. Maak in het OpenAI
+platform een aparte Admin-key met uitsluitend de leesrechten voor kosten/usage
+die het portaal aanbiedt. Bewaar die uitsluitend via
+`data/set-synology-wardrobe-openai-admin-key.ps1`; de key komt dan alleen in de
+lokale `.env` met modus `0600` en wordt niet aan Git of de browser blootgesteld.
+
+Zonder `OPENAI_COSTS_PROJECT_ID` toont Wardrobe de exacte kosten voor de hele
+OpenAI-organisatie. Vul deze optionele lokale variabele alleen in wanneer je
+de kosten tot één project wilt beperken. Omdat Wardrobe lokaal geen eigen
+gebruikersauthenticatie heeft, kunnen apparaten die al toegang hebben tot de
+Wardrobe-webinterface ook deze kostentotalen zien.
+
 ## Updates en rollback
 
 `wardrobe-update-check` controleert dagelijks alleen GitHub en schrijft de

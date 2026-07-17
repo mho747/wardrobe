@@ -60,6 +60,8 @@ If you are setting up Wardrobe for a user, ask how they want to import their clo
 | Variable | Default |
 | --- | --- |
 | `OPENAI_API_KEY` | Required |
+| `OPENAI_ADMIN_API_KEY` | Optional; server-only key for the exact Costs view |
+| `OPENAI_COSTS_PROJECT_ID` | Optional; limits the Costs view to one project |
 | `OPENAI_VISION_MODEL` | `gpt-5.4-mini` |
 | `OPENAI_IMAGE_MODEL` | `gpt-image-2` |
 | `OPENAI_IMAGE_QUALITY` | `high` |

@@ -57,6 +57,63 @@ button { font: inherit; }
   text-transform: uppercase;
 }
 
+.cost-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.cost-button:hover,
+.cost-button:focus-visible { border-color: var(--ink); background: rgba(25, 25, 25, .07); }
+
+.cost-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(25, 24, 22, .28);
+}
+
+.cost-panel {
+  position: relative;
+  width: min(100%, 390px);
+  min-height: 100%;
+  padding: 58px 34px 38px;
+  background: var(--paper);
+  box-shadow: -22px 0 50px rgba(25, 24, 22, .16);
+}
+
+.cost-eyebrow,
+.cost-scope,
+.cost-updated {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cost-eyebrow { letter-spacing: .12em; text-transform: uppercase; }
+.cost-panel h2 { margin: 9px 0 30px; font-size: 42px; font-weight: 500; letter-spacing: -.05em; }
+.cost-status { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.cost-error { color: var(--accent); }
+.cost-total-list { display: grid; gap: 10px; margin: 18px 0 26px; }
+.cost-total-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; padding: 17px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.cost-total-list span,
+.cost-detail-row span { color: var(--muted); font-size: 13px; }
+.cost-total-list strong { font-size: 24px; letter-spacing: -.04em; }
+.cost-detail-list { display: grid; gap: 12px; }
+.cost-detail-row { display: flex; justify-content: space-between; gap: 20px; font-size: 13px; }
+.cost-detail-row strong { text-align: right; }
+.cost-updated { margin-top: 28px; }
+.cost-refresh { margin-top: 20px; }
+
 .category-nav {
   width: max-content;
   max-width: 100%;
@@ -843,6 +900,7 @@ button { font: inherit; }
     padding: 30px 20px 50px;
   }
   .gallery-item { padding: 5px; }
+  .cost-panel { width: min(100%, 440px); }
   .viewer-overlay { background: rgba(25, 24, 22, .34); }
   .viewer-entry { width: 100%; height: 100dvh; }
   .viewer {
@@ -899,6 +957,7 @@ button { font: inherit; }
   .color-controls { align-items: flex-start; flex-direction: column; }
   .sample-button { width: 100%; }
   .gallery-meta-row { align-items: flex-start; }
+  .cost-panel { padding: max(32px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

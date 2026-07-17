@@ -44,6 +44,10 @@ test_candidate_api() {
   docker exec "$1" node -e "const http=require('node:http');const request=http.get('http://127.0.0.1:4173/api/import/config',(response)=>{let body='';response.on('data',(chunk)=>body+=chunk);response.on('end',()=>{try{const value=JSON.parse(body);process.exit(response.statusCode===200&&typeof value.ready==='boolean'&&typeof value.hasApiKey==='boolean'&&typeof value.hasModelReference==='boolean'?0:1)}catch{process.exit(1)}})});request.setTimeout(4000,()=>request.destroy(new Error('timeout')));request.on('error',()=>process.exit(1));"
 }
 
+test_candidate_costs_api() {
+  docker exec "$1" node -e "const http=require('node:http');const request=http.get('http://127.0.0.1:4173/api/import/costs',(response)=>{let body='';response.on('data',(chunk)=>body+=chunk);response.on('end',()=>{try{const value=JSON.parse(body);process.exit(response.statusCode===503&&value.configured===false?0:1)}catch{process.exit(1)}})});request.setTimeout(4000,()=>request.destroy(new Error('timeout')));request.on('error',()=>process.exit(1));"
+}
+
 cd "$ROOT"
 test -f .env || fail 'Missing .env. Create it from .env.example with the production secret only on the Synology.'
 test -z "$(git status --porcelain)" || fail 'Refusing update test: the deployment checkout has uncommitted changes.'
@@ -109,6 +113,8 @@ chown 1000:1000 "$candidate_data" "$candidate_backups" "$candidate_state"
 chmod 700 "$candidate_data" "$candidate_backups" "$candidate_state"
 printf '%s\n' \
   'OPENAI_API_KEY=' \
+  'OPENAI_ADMIN_API_KEY=' \
+  'OPENAI_COSTS_PROJECT_ID=' \
   'OPENAI_VISION_MODEL=gpt-5.4-mini' \
   'OPENAI_IMAGE_MODEL=gpt-image-2' \
   'OPENAI_IMAGE_QUALITY=high' \
@@ -126,4 +132,5 @@ chmod 600 "$candidate_dir/.env"
 compose -p "$candidate_project" -f "$candidate_dir/compose.yaml" up -d --build wardrobe
 wait_for_healthy "$candidate_container" || fail 'Candidate container did not become healthy within 40 seconds.'
 test_candidate_api "$candidate_container" || fail 'Candidate API smoke test failed.'
+test_candidate_costs_api "$candidate_container" || fail 'Candidate Costs API negative test failed.'
 printf 'Candidate passed: %s. No production files, data, or containers were changed.\n' "$candidate_revision"
