@@ -13,11 +13,21 @@ cd "$ROOT"
 test -f .env || fail 'Missing .env. Refusing update.'
 test -z "$(git status --porcelain)" || fail 'Refusing update: the deployment checkout has uncommitted changes.'
 test "${1:-}" = '--approved-sensitive' || fail 'Refusing update without --approved-sensitive after an explicit human approval.'
+backup_container_name="$(awk -F= '$1 == "WARDROBE_BACKUP_CONTAINER_NAME" { print substr($0, index($0, "=") + 1); exit }' .env)"
+backup_container_name="${backup_container_name:-wardrobe-backup}"
 
 git remote get-url origin >/dev/null 2>&1 || git remote add origin "$GITHUB_REPOSITORY_URL"
 git fetch --prune origin "$GITHUB_BRANCH"
 previous_revision="$(git rev-parse HEAD)"
 candidate_revision="$(git rev-parse "origin/$GITHUB_BRANCH")"
+if [ -n "${WARDROBE_TEST_CANDIDATE_REVISION:-}" ]; then
+  [ "${WARDROBE_ROLLBACK_TEST:-0}" = '1' ] || fail 'Refusing a non-GitHub candidate outside the isolated rollback test.'
+  case "${WARDROBE_BASE_PATH:-}" in
+    /volume1/docker/wardrobe/candidates/rollback-test-*) ;;
+    *) fail 'Refusing a non-GitHub candidate outside the isolated rollback-test path.' ;;
+  esac
+  candidate_revision="$(git rev-parse --verify "${WARDROBE_TEST_CANDIDATE_REVISION}^{commit}")"
+fi
 
 if [ "$previous_revision" = "$candidate_revision" ]; then
   printf 'No GitHub update is available. Current revision: %s\n' "$previous_revision"
@@ -30,7 +40,7 @@ if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev
   fail 'Docker Compose is not installed on this Synology.'
 fi
 
-docker exec -e WARDROBE_BACKUP_ONCE=1 wardrobe-backup /bin/sh /usr/local/bin/wardrobe-backup
+docker exec -e WARDROBE_BACKUP_ONCE=1 "$backup_container_name" /bin/sh /usr/local/bin/wardrobe-backup
 
 rollback() {
   printf 'Update failed; restoring verified revision %s.\n' "$previous_revision" >&2

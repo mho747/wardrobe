@@ -62,5 +62,14 @@ backup, accepteert uitsluitend een fast-forward uit de GitHub-bron, verifieert
 de nieuwe container en zet bij een fout automatisch de vorige Git-revisie terug.
 De rollback wordt met dezelfde healthcheck en API-controle geverifieerd.
 
+Voor een aantoonbare hersteltest is `scripts/test-rollback.sh` beschikbaar.
+Dat script kloont opnieuw vanaf GitHub naar een tijdelijke submap onder
+`candidates`, gebruikt alleen `127.0.0.1:4175` (en `4174` voor de kandidaat),
+een testreferentie en een niet-werkende testkey. Het forceert een eenmalige
+fout in de kandidaatrelease, controleert dat de automatische rollback de
+vorige Git-revisie en een healthy container terugbrengt, en verwijdert daarna
+alle tijdelijke containers en data. Het doet geen OpenAI-aanroep en raakt
+poort 4173 of productiedata niet.
+
 Een applicatierollback wijzigt nooit `data/`. Herstel van gebruikersdata uit
 een gevalideerde back-up is een aparte, expliciet goed te keuren handeling.

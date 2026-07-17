@@ -45,6 +45,14 @@ git fetch --prune origin "$GITHUB_BRANCH"
 
 current_revision="$(git rev-parse HEAD)"
 candidate_revision="$(git rev-parse "origin/$GITHUB_BRANCH")"
+if [ -n "${WARDROBE_TEST_CANDIDATE_REVISION:-}" ]; then
+  [ "${WARDROBE_ROLLBACK_TEST:-0}" = '1' ] || fail 'Refusing a non-GitHub candidate outside the isolated rollback test.'
+  case "${WARDROBE_BASE_PATH:-}" in
+    /volume1/docker/wardrobe/candidates/rollback-test-*) ;;
+    *) fail 'Refusing a non-GitHub candidate outside the isolated rollback-test path.' ;;
+  esac
+  candidate_revision="$(git rev-parse --verify "${WARDROBE_TEST_CANDIDATE_REVISION}^{commit}")"
+fi
 if [ "$current_revision" = "$candidate_revision" ]; then
   printf 'No GitHub update is available. Current revision: %s\n' "$current_revision"
   exit 0
@@ -72,6 +80,14 @@ candidate_container="wardrobe-candidate-$run_id"
 candidate_backup_container="wardrobe-candidate-backup-$run_id"
 candidate_update_container="wardrobe-candidate-update-$run_id"
 candidate_project="wardrobe-candidate-$run_id"
+candidate_port="${WARDROBE_CANDIDATE_PORT:-4174}"
+
+case "$candidate_port" in
+  ''|*[!0-9]*) fail 'WARDROBE_CANDIDATE_PORT must be a numeric host port.' ;;
+esac
+if docker ps --format '{{.Ports}}' | grep -F ":$candidate_port->" >/dev/null; then
+  fail "Candidate host port $candidate_port is already in use; no candidate was started."
+fi
 
 mkdir -p "$CANDIDATES_ROOT"
 git worktree add --detach "$candidate_dir" "$candidate_revision"
@@ -90,7 +106,7 @@ printf '%s\n' \
   'OPENAI_IMAGE_MODEL=gpt-image-2' \
   'OPENAI_IMAGE_QUALITY=high' \
   'WARDROBE_BIND_ADDRESS=127.0.0.1' \
-  'WARDROBE_HOST_PORT=4174' \
+  "WARDROBE_HOST_PORT=$candidate_port" \
   "WARDROBE_DATA_HOST_PATH=$candidate_data" \
   "WARDROBE_BACKUP_HOST_PATH=$candidate_backups" \
   "WARDROBE_UPDATE_STATE_HOST_PATH=$candidate_state" \
