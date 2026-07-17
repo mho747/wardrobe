@@ -49,6 +49,14 @@ De installatie is pas geslaagd wanneer de API `ready: true` teruggeeft. Dat
 bevestigt de geheime key en de lokale referentiefoto zonder de key te tonen of
 een betaalde OpenAI-aanroep te doen.
 
+## OpenAI-key veilig vervangen
+
+Vervang een key uitsluitend via het versiebeheer-script op de NAS, uitgevoerd
+met een interactieve SSH-terminal. Het vraagt de key verborgen via `/dev/tty`,
+vervangt alleen de overeenkomstige regel in de lokale `.env`, herstart alleen
+de `wardrobe`-container en herstelt de vorige `.env` wanneer de healthcheck
+faalt. Er vindt geen OpenAI-aanroep plaats.
+
 ## Updates en rollback
 
 `wardrobe-update-check` controleert dagelijks alleen GitHub en schrijft de
