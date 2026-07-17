@@ -98,6 +98,7 @@ printf '%s\n' "$run_id" > "$TEST_REPOSITORY/.rollback-test-marker"
 git -C "$TEST_REPOSITORY" add .rollback-test-marker
 git -C "$TEST_REPOSITORY" commit -m 'Temporary isolated rollback test candidate' >/dev/null
 candidate_revision="$(git -C "$TEST_REPOSITORY" rev-parse HEAD)"
+git -C "$TEST_REPOSITORY" reset --hard "$previous_revision" >/dev/null
 touch "$force_file"
 
 if (
