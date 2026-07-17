@@ -83,3 +83,12 @@ poort 4173 of productiedata niet.
 
 Een applicatierollback wijzigt nooit `data/`. Herstel van gebruikersdata uit
 een gevalideerde back-up is een aparte, expliciet goed te keuren handeling.
+
+## Finale verificatie
+
+`scripts/verify-synology.sh` is uitsluitend voor een gecontroleerde live
+verificatie met `sudo`. Het controleert de persistente mappen en rechten,
+herstart alleen `wardrobe`, valideert een nieuwe back-up, verifieert de
+LAN-binding en dwingt een alleen-lezen GitHub-updatecheck af. Daarna draait het
+de geïsoleerde rollbacktest in `candidates`; productiepoort 4173, productiedata
+en OpenAI blijven buiten die test.
