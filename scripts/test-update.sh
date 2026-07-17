@@ -3,7 +3,14 @@ set -eu
 PATH="/usr/local/bin:$PATH"
 export PATH
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+if [ -n "${WARDROBE_DEPLOYMENT_ROOT:-}" ]; then
+  case "$WARDROBE_DEPLOYMENT_ROOT" in
+    /volume1/docker/wardrobe/repository) ROOT="$WARDROBE_DEPLOYMENT_ROOT" ;;
+    *) printf '%s\n' 'WARDROBE_DEPLOYMENT_ROOT is only permitted for the Wardrobe production checkout.' >&2; exit 1 ;;
+  esac
+else
+  ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+fi
 CANDIDATES_ROOT="${WARDROBE_CANDIDATES_ROOT:-/volume1/docker/wardrobe/candidates}"
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 GITHUB_REPOSITORY_URL="${GITHUB_REPOSITORY_URL:-https://github.com/mho747/wardrobe.git}"
