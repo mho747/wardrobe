@@ -53,6 +53,10 @@ container_name="$(env_value WARDROBE_CONTAINER_NAME wardrobe)"
 backup_container_name="$(env_value WARDROBE_BACKUP_CONTAINER_NAME wardrobe-backup)"
 bind_address="$(awk -F= '$1 == "WARDROBE_BIND_ADDRESS" { print substr($0, index($0, "=") + 1); exit }' .env)"
 test -n "$bind_address" || fail 'WARDROBE_BIND_ADDRESS must be set to the Synology LAN IP.'
+host_port="$(env_value WARDROBE_HOST_PORT 4173)"
+case "$host_port" in
+  ''|*[!0-9]*) fail 'WARDROBE_HOST_PORT must be numeric.' ;;
+esac
 data_path="$(awk -F= '$1 == "WARDROBE_DATA_HOST_PATH" { print substr($0, index($0, "=") + 1); exit }' .env)"
 test "$data_path" = "$EXPECTED_DATA_PATH" || fail "WARDROBE_DATA_HOST_PATH must be $EXPECTED_DATA_PATH."
 for directory in "$BASE_PATH/data" "$BASE_PATH/backups" "$BASE_PATH/update-state" "$BASE_PATH/candidates"; do
@@ -93,7 +97,7 @@ docker exec "$backup_container_name" tar -tzf "/backups/$last_backup" >/dev/null
 published_ip="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4173/tcp") 0).HostIp}}' "$container_name")"
 published_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "4173/tcp") 0).HostPort}}' "$container_name")"
 test "$published_ip" = "$bind_address" || fail 'Container port is not bound only to the configured LAN IP.'
-test "$published_port" = '4173' || fail 'Container is not published on host port 4173.'
+test "$published_port" = "$host_port" || fail "Container is not published on host port $host_port."
 image_revision="$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$container_name")"
 test "$image_revision" = "$revision" || fail 'Running container image does not report the expected Git revision.'
 
