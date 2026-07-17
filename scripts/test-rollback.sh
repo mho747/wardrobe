@@ -6,7 +6,7 @@ export PATH
 GITHUB_REPOSITORY_URL="${GITHUB_REPOSITORY_URL:-https://github.com/mho747/wardrobe.git}"
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 CANDIDATES_ROOT="${WARDROBE_CANDIDATES_ROOT:-/volume1/docker/wardrobe/candidates}"
-run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+run_id="$(date -u +%Y%m%d%H%M%S)-$$"
 TEST_BASE="$CANDIDATES_ROOT/rollback-test-$run_id"
 TEST_REPOSITORY="$TEST_BASE/repository"
 TEST_PROJECT="wardrobe-rollback-test-$run_id"
