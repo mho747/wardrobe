@@ -1,0 +1,81 @@
+#!/bin/sh
+set -eu
+PATH="/usr/local/bin:$PATH"
+export PATH
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+ENV_FILE="$ROOT/.env"
+TTY=/dev/tty
+replacement=
+rollback=
+
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 1
+}
+
+cleanup() {
+  stty echo < "$TTY" >/dev/null 2>&1 || true
+  for file in "${replacement:-}" "${rollback:-}"; do
+    case "$file" in
+      "$ROOT"/.env.key-update.*|"$ROOT"/.env.rollback.*) rm -f "$file" ;;
+    esac
+  done
+}
+trap cleanup EXIT HUP INT TERM
+
+[ -r "$TTY" ] && [ -w "$TTY" ] || fail 'An interactive terminal is required for hidden key entry.'
+test -f "$ENV_FILE" || fail 'Missing Wardrobe .env.'
+command -v docker >/dev/null 2>&1 || fail 'Docker is required.'
+
+container_name="$(awk -F= '$1 == "WARDROBE_CONTAINER_NAME" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE")"
+container_name="${container_name:-wardrobe}"
+
+printf '%s' 'OpenAI API key (hidden): ' > "$TTY"
+stty -echo < "$TTY"
+IFS= read -r api_key < "$TTY"
+stty echo < "$TTY"
+printf '\n' > "$TTY"
+test -n "$api_key" || fail 'The OpenAI API key is empty.'
+
+umask 077
+replacement="$(mktemp "$ROOT/.env.key-update.XXXXXX")"
+rollback="$(mktemp "$ROOT/.env.rollback.XXXXXX")"
+cp "$ENV_FILE" "$rollback"
+found=0
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in
+    OPENAI_API_KEY=*) printf 'OPENAI_API_KEY=%s\n' "$api_key" >> "$replacement"; found=1 ;;
+    *) printf '%s\n' "$line" >> "$replacement" ;;
+  esac
+done < "$ENV_FILE"
+[ "$found" -eq 1 ] || printf 'OPENAI_API_KEY=%s\n' "$api_key" >> "$replacement"
+chmod 600 "$replacement"
+mv "$replacement" "$ENV_FILE"
+replacement=
+
+restore_previous_key() {
+  mv "$rollback" "$ENV_FILE"
+  rollback=
+  docker compose -f "$ROOT/compose.yaml" up -d --no-deps --force-recreate wardrobe >/dev/null
+}
+
+if ! docker compose -f "$ROOT/compose.yaml" up -d --no-deps --force-recreate wardrobe; then
+  restore_previous_key || true
+  fail 'Wardrobe could not be recreated after the key update.'
+fi
+
+attempts=0
+health=
+while [ "$attempts" -lt 20 ]; do
+  health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_name" 2>/dev/null || true)"
+  [ "$health" = healthy ] && break
+  [ "$health" = unhealthy ] && { restore_previous_key || true; fail 'Wardrobe became unhealthy after the key update.'; }
+  attempts=$((attempts + 1))
+  sleep 2
+done
+[ "$health" = healthy ] || { restore_previous_key || true; fail 'Wardrobe did not become healthy within 40 seconds.'; }
+
+rm -f "$rollback"
+rollback=
+printf '%s\n' 'OpenAI API key stored locally. Wardrobe is healthy; no OpenAI request was made.'
